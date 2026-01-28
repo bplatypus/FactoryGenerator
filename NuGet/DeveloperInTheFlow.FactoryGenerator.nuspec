@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
 	<metadata>
 		<id>DeveloperInTheFlow.FactoryGenerator</id>
-		<version>3.9.0</version>
+		<version>3.9.1</version>
 		<title>Factory Generator (Roslyn)</title>
 		<authors>Pedro Pombeiro,Daniel Romero,Benjamin Burgy</authors>
 		<owners>Pedro Pombeiro</owners>
@@ -21,6 +21,8 @@
 		<file src="..\bin\Release\net48\DefaultTemplate.render" target="tools\DefaultTemplate.render" />
 		<file src="..\bin\Release\net48\FactoryGenerator.exe" target="tools\FactoryGenerator.exe" />
 		<file src="..\bin\Release\net48\FactoryGenerator.exe.config" target="tools\FactoryGenerator.exe.config" />
+		<file src="..\bin\Release\net48\BuildHost-net472\**" target="tools\BuildHost-net472\" />
+		<file src="..\bin\Release\net48\BuildHost-netcore\**" target="tools\BuildHost-netcore\" />
 		<file src="..\bin\Release\net48\CommandLine.dll" target="tools\" />
 		<file src="..\bin\Release\net48\Common.Logging.Core.dll" target="tools\" />
 		<file src="..\bin\Release\net48\Common.Logging.dll" target="tools\" />

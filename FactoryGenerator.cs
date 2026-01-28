@@ -314,8 +314,6 @@
                     return line.Contains("Sdk=\"Microsoft.NET.Sdk");
                 }
             }
-
-            throw new NotSupportedException($"Not able to detect project style for {path}!");
         }
 
         private static bool IsTypeDeclarationSyntaxFactoryTarget(ClassDeclarationSyntax classDeclarationSyntax)
@@ -325,8 +323,7 @@
             return attributeListSyntaxes.Count > 0 &&
                    attributeListSyntaxes.SelectMany(a => a.Attributes).Any(x =>
                                                                            {
-                                                                               var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
-                                                                               var attributeClassName = qualifiedNameSyntax != null
+                                                                               var attributeClassName = x.Name is QualifiedNameSyntax qualifiedNameSyntax
                                                                                                             ? qualifiedNameSyntax.Right.Identifier.ToString()
                                                                                                             : x.Name.ToString();
                                                                                return attributeClassName == "GenerateFactory" || attributeClassName == "GenerateFactoryAttribute";
@@ -338,13 +335,13 @@
                                                         string[] obsoleteFactoryFilePaths,
                                                         string[] newFactoryFilePaths)
         {
-            var ellapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
+            var elapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
             var statisticsFormat = obsoleteFactoryFilePaths.Any() || newFactoryFilePaths.Any()
                                        ? "{0} (+{1}/-{2})"
                                        : "{0}";
             var factoryStatistics = statisticsFormat.FormatWith("factory".ToQuantity(generatedFactoryFilePaths.Length), newFactoryFilePaths.Length, obsoleteFactoryFilePaths.Length);
 
-            Logger.InfoFormat("Generated {0} in {1}.", factoryStatistics, ellapsedTime.Humanize(2));
+            Logger.InfoFormat("Generated {0} in {1}.", factoryStatistics, elapsedTime.Humanize(2));
         }
 
         private static ITypeSymbol ResolveGenericArgument(INamedTypeSymbol factoryInterfaceTypeSymbol,
@@ -431,7 +428,7 @@
             {
                 var syntaxRootNode = await syntaxTree.GetRootAsync();
                 var classDeclarations =
-                    syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
+                    syntaxRootNode.DescendantNodesAndSelf(syntaxNode => syntaxNode is not ClassDeclarationSyntax)
                                   .OfType<ClassDeclarationSyntax>()
                                   .Where(IsTypeDeclarationSyntaxFactoryTarget)
                                   .ToArray();
@@ -473,7 +470,7 @@
 
             INamedTypeSymbol factoryInterfaceTypeSymbol;
 
-            var genericArgumentTypeSymbols = new INamedTypeSymbol[0];
+            var genericArgumentTypeSymbols = Array.Empty<INamedTypeSymbol>();
 
             if (factoryAttribute.ArgumentList != null && factoryAttribute.ArgumentList.Arguments.Any())
             {
@@ -484,7 +481,7 @@
                                                            .Select(syntax => syntax.Name.NormalizeWhitespace().ToFullString())
                                                            .ToArray();
 
-                var namespaces = usings.Concat(new[] { GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax) });
+                var namespaces = usings.Concat([GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax)]);
 
                 var typeName = ((TypeOfExpressionSyntax)typeOfArgument.Expression).Type.ToFullString();
 
@@ -495,7 +492,7 @@
                     var genericArgumentCount = genericArguments.Length;
 
                     genericArgumentTypeSymbols = genericArguments.SelectMany(arg => namespaces.Select(ns => $"{ns}.{arg}")
-                                                                                              .Concat(new[] { arg })
+                                                                                              .Concat([arg])
                                                                                               .Select(compilation.GetTypeByMetadataName)
                                                                                               .Where(o => o != null)
                                                                                               .DefaultIfEmpty(null))
@@ -509,9 +506,9 @@
                     typeName = typeName.Replace(genericsPostfix, $"`{genericArgumentCount}");
                 }
 
-                var fulltypeNames = namespaces.Select(ns => $"{ns}.{typeName}").Concat(new[] { typeName });
+                var fullTypeNames = namespaces.Select(ns => $"{ns}.{typeName}").Concat([typeName]);
 
-                factoryInterfaceTypeSymbol = fulltypeNames.Select(compilation.GetTypeByMetadataName).FirstOrDefault(o => o != null);
+                factoryInterfaceTypeSymbol = fullTypeNames.Select(compilation.GetTypeByMetadataName).FirstOrDefault(o => o != null);
 
                 if (factoryInterfaceTypeSymbol == null)
                 {
@@ -548,7 +545,7 @@
             using SHA1Managed sha1 = new SHA1Managed();
             var hash = sha1.ComputeHash(File.ReadAllBytes(typeDeclarationDocument.FilePath));
             var fileHashBuilder = new StringBuilder(2 * hash.Length);
-            foreach (byte b in hash)
+            foreach (var b in hash)
             {
                 fileHashBuilder.AppendFormat("{0:X2}", b);
             }
@@ -659,7 +656,7 @@
             var concreteClassName = GetXmlDocSafeTypeName(concreteClassTypeSymbol.ToString());
             var @namespace = GetDeclarationNamespaceFullName(concreteClassDeclarationSyntax);
 
-            var generateCodeArguments = new[] { new Value("\"DeveloperInTheFlow.FactoryGenerator\"", false), new Value(string.Format("\"{0}\"", this.version), true) };
+            var generateCodeArguments = new[] { new Value("\"DeveloperInTheFlow.FactoryGenerator\"", false), new Value($"\"{this.version}\"", true) };
 
             // Class attributes
             var classAttributes = concreteClassDeclarationSyntax.AttributeLists
@@ -681,11 +678,10 @@
                                                                             return Attribute.Create(a.Name.ToString(), arguments);
                                                                         })
                                                                 .Concat(
-                                                                        new[]
-                                                                        {
-                                                                            Attribute.Create("global::System.CodeDom.Compiler.GeneratedCode", generateCodeArguments),
-                                                                            Attribute.Create("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
-                                                                        }).ToArray();
+                                                                [
+                                                                    Attribute.Create("global::System.CodeDom.Compiler.GeneratedCode", generateCodeArguments),
+                                                                    Attribute.Create("global::System.Diagnostics.DebuggerNonUserCodeAttribute")
+                                                                ]).ToArray();
 
             // Generic types of the factory
             var classGenericTypes = this.genericTypeBuilderService.Build(factoryInterfaceTypeSymbol.TypeParameters, genericArgumentTypeSymbols);
@@ -730,14 +726,9 @@
                 var attributesArray = (JArray)json["Class"]["Attributes"];
                 var factoryForAttributes = attributesArray.Where(a => a["Name"]?.ToString().Contains("FactoryFor") == true).ToList();
 
-                if (factoryForAttributes.Count > 1)
-                {
-                    model = TransformMultipleFactoryForAttributes(json, factoryForAttributes, transformationScript);
-                }
-                else
-                {
-                    model = this.Transform(json, transformationScript);
-                }
+                model = factoryForAttributes.Count > 1
+                            ? this.TransformMultipleFactoryForAttributes(json, factoryForAttributes, transformationScript)
+                            : this.Transform(json, transformationScript);
             }
 
             var projectFolder = Path.GetDirectoryName(project.FilePath);
@@ -802,9 +793,9 @@
 
             // Transform base model and add all transformed attributes
             var model = this.Transform(json, transformationScript);
-            if (model is JObject finalModel)
+            if (model != null)
             {
-                var finalAttrs = (JArray)finalModel["Class"]["Attributes"];
+                var finalAttrs = (JArray)model["Class"]["Attributes"];
                 foreach (var attr in transformedAttributes) finalAttrs.Add(attr);
             }
 

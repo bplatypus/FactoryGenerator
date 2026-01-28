@@ -45,6 +45,14 @@
 
         private readonly ConstructorBuilderService constructorBuilderService;
 
+        private readonly Lazy<IEvaluator> csscriptEvaluator = new(() =>
+                                                                  {
+                                                                      CSScript.EvaluatorConfig.ReferenceDomainAssemblies = true;
+                                                                      return CSScript.Evaluator.ReferenceAssembly(typeof(JObject).Assembly)
+                                                                                     .ReferenceAssembly(typeof(System.Linq.Enumerable).Assembly)
+                                                                                     .ReferenceAssembly(typeof(System.Text.RegularExpressions.Regex).Assembly);
+                                                                  });
+
         private readonly FieldsBuilderService fieldsBuilderService;
 
         private readonly bool forceGeneration;
@@ -59,14 +67,6 @@
 
         private readonly Workspace workspace;
 
-        private Lazy<IEvaluator> csscriptEvaluator = new(() =>
-                                                         {
-                                                             CSScript.EvaluatorConfig.ReferenceDomainAssemblies = true;
-                                                             return CSScript.Evaluator.ReferenceAssembly(typeof(JObject).Assembly)
-                                                                            .ReferenceAssembly(typeof(System.Linq.Enumerable).Assembly)
-                                                                            .ReferenceAssembly(typeof(System.Text.RegularExpressions.Regex).Assembly);
-                                                         });
-
         private Solution solution;
 
         #endregion
@@ -74,13 +74,12 @@
         #region Constructors and Destructors
 
         [DebuggerStepThrough]
-        public FactoryGenerator(
-            Workspace workspace,
-            Solution solution,
-            IEnumerable<string> attributeImportList,
-            bool writeXmlDoc,
-            string templatePath,
-            bool forceGeneration)
+        public FactoryGenerator(Workspace workspace,
+                                Solution solution,
+                                IEnumerable<string> attributeImportList,
+                                bool writeXmlDoc,
+                                string templatePath,
+                                bool forceGeneration)
         {
             this.workspace = workspace;
             this.solution = solution;
@@ -161,8 +160,7 @@
 
         #region Methods
 
-        private static async Task<ICollection<string>> CatalogGeneratedFactoriesInProjectAsync(
-            Compilation compilation)
+        private static async Task<ICollection<string>> CatalogGeneratedFactoriesInProjectAsync(Compilation compilation)
         {
             var generatedFactoriesCatalog = new List<string>(16);
 
@@ -172,9 +170,7 @@
                 var generatedFactoryClassDeclarations =
                     syntaxRootNode.DescendantNodesAndSelf(syntaxNode => !(syntaxNode is ClassDeclarationSyntax))
                                   .OfType<ClassDeclarationSyntax>()
-                                  .Where(
-                                         classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(
-                                                                                                                                                                                              x =>
+                                  .Where(classDeclarationSyntax => classDeclarationSyntax.AttributeLists.Count > 0 && classDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes).Any(x =>
                                                                                                                                                                                               {
                                                                                                                                                                                                   var attributeClassName = x.Name.ToString();
                                                                                                                                                                                                   return attributeClassName == "global::System.CodeDom.Compiler.GeneratedCode";
@@ -192,16 +188,14 @@
             return generatedFactoriesCatalog;
         }
 
-        private static bool CompareParameters(
-            IParameterSymbol parameter1,
-            IParameterSymbol parameter2)
+        private static bool CompareParameters(IParameterSymbol parameter1,
+                                              IParameterSymbol parameter2)
         {
             return (parameter1.Name == parameter2.Name);
         }
 
-        private static SyntaxList<UsingDirectiveSyntax> FilterOutUsings(
-            SyntaxList<UsingDirectiveSyntax> usings,
-            string[] usingsToFilterOut)
+        private static SyntaxList<UsingDirectiveSyntax> FilterOutUsings(SyntaxList<UsingDirectiveSyntax> usings,
+                                                                        string[] usingsToFilterOut)
         {
             for (;;)
             {
@@ -215,17 +209,15 @@
             }
         }
 
-        private static Document FindDocumentFromPath(
-            Solution solution,
-            string filePath)
+        private static Document FindDocumentFromPath(Solution solution,
+                                                     string filePath)
         {
             return solution.Projects
                            .Select(project => project.Documents.FirstOrDefault(d => d.FilePath == filePath))
                            .FirstOrDefault(document => document != null);
         }
 
-        private static string GetDeclarationFullName(
-            TypeDeclarationSyntax typeDeclarationSyntax)
+        private static string GetDeclarationFullName(TypeDeclarationSyntax typeDeclarationSyntax)
         {
             var typeParameterCount = typeDeclarationSyntax.TypeParameterList == null
                                          ? 0
@@ -240,22 +232,19 @@
             return fullyQualifiedName;
         }
 
-        private static string GetDeclarationNamespaceFullName(
-            CSharpSyntaxNode typeDeclarationSyntax)
+        private static string GetDeclarationNamespaceFullName(CSharpSyntaxNode typeDeclarationSyntax)
         {
             var namespaceDeclarationSyntax = typeDeclarationSyntax.FirstAncestorOrSelf<BaseNamespaceDeclarationSyntax>();
             return namespaceDeclarationSyntax.Name.ToString();
         }
 
-        private static AttributeSyntax GetFactoryAttributeFromClassDeclaration(
-            ClassDeclarationSyntax concreteClassDeclarationSyntax)
+        private static AttributeSyntax GetFactoryAttributeFromClassDeclaration(ClassDeclarationSyntax concreteClassDeclarationSyntax)
         {
             AttributeSyntax factoryAttribute;
             try
             {
                 factoryAttribute = concreteClassDeclarationSyntax.AttributeLists.SelectMany(a => a.Attributes)
-                                                                 .SingleOrDefault(
-                                                                                  a =>
+                                                                 .SingleOrDefault(a =>
                                                                                   {
                                                                                       var attributeClassFullName = a.Name.NormalizeWhitespace().ToFullString();
                                                                                       return attributeClassFullName.EndsWith("GenerateFactoryAttribute") || attributeClassFullName.EndsWith("GenerateFactory");
@@ -269,27 +258,24 @@
             return factoryAttribute;
         }
 
-        private static string GetFactoryClassGenericName(
-            ClassDeclarationSyntax concreteTypeDeclarationSyntax,
-            INamedTypeSymbol factoryInterfaceTypeSymbol)
+        private static string GetFactoryClassGenericName(ClassDeclarationSyntax concreteTypeDeclarationSyntax,
+                                                         INamedTypeSymbol factoryInterfaceTypeSymbol)
         {
             var factoryClassName = "{0}Factory{1}".FormatWith(concreteTypeDeclarationSyntax.Identifier.ValueText, GetTypeParametersDeclaration(factoryInterfaceTypeSymbol.TypeParameters));
 
             return factoryClassName;
         }
 
-        private static string GetSafeFileName(
-            string identifier)
+        private static string GetSafeFileName(string identifier)
         {
             return identifier.Contains("<")
                        ? identifier.Substring(0, identifier.IndexOf("<", StringComparison.Ordinal))
                        : identifier;
         }
 
-        private static (ITypeSymbol returnType, IMethodSymbol symbol)[] GetSuitableFactoryInterfaceMethods(
-            INamedTypeSymbol concreteClassTypeSymbol,
-            INamedTypeSymbol factoryInterfaceTypeSymbol,
-            INamedTypeSymbol[] genericArgumentTypeSymbols)
+        private static (ITypeSymbol returnType, IMethodSymbol symbol)[] GetSuitableFactoryInterfaceMethods(INamedTypeSymbol concreteClassTypeSymbol,
+                                                                                                           INamedTypeSymbol factoryInterfaceTypeSymbol,
+                                                                                                           INamedTypeSymbol[] genericArgumentTypeSymbols)
         {
             return factoryInterfaceTypeSymbol
                    .AllInterfaces
@@ -300,8 +286,7 @@
                    .ToArray();
         }
 
-        private static string GetTypeParametersDeclaration(
-            ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
+        private static string GetTypeParametersDeclaration(ImmutableArray<ITypeParameterSymbol> typeParameterSymbols)
         {
             var typeParameters = string.Empty;
 
@@ -313,14 +298,12 @@
             return typeParameters;
         }
 
-        private static string GetXmlDocSafeTypeName(
-            string typeName)
+        private static string GetXmlDocSafeTypeName(string typeName)
         {
             return typeName.Replace("<", "{").Replace(">", "}");
         }
 
-        private static async Task<bool> IsSdkStyleProjectAsync(
-            string path)
+        private static async Task<bool> IsSdkStyleProjectAsync(string path)
         {
             using var streamReader = new StreamReader(File.OpenRead(path));
             while (true)
@@ -335,14 +318,12 @@
             throw new NotSupportedException($"Not able to detect project style for {path}!");
         }
 
-        private static bool IsTypeDeclarationSyntaxFactoryTarget(
-            ClassDeclarationSyntax classDeclarationSyntax)
+        private static bool IsTypeDeclarationSyntaxFactoryTarget(ClassDeclarationSyntax classDeclarationSyntax)
         {
             var attributeListSyntaxes = classDeclarationSyntax.AttributeLists;
 
             return attributeListSyntaxes.Count > 0 &&
-                   attributeListSyntaxes.SelectMany(a => a.Attributes).Any(
-                                                                           x =>
+                   attributeListSyntaxes.SelectMany(a => a.Attributes).Any(x =>
                                                                            {
                                                                                var qualifiedNameSyntax = x.Name as Microsoft.CodeAnalysis.CSharp.Syntax.QualifiedNameSyntax;
                                                                                var attributeClassName = qualifiedNameSyntax != null
@@ -352,11 +333,10 @@
                                                                            });
         }
 
-        private static void LogCodeGenerationStatistics(
-            Stopwatch chrono,
-            string[] generatedFactoryFilePaths,
-            string[] obsoleteFactoryFilePaths,
-            string[] newFactoryFilePaths)
+        private static void LogCodeGenerationStatistics(Stopwatch chrono,
+                                                        string[] generatedFactoryFilePaths,
+                                                        string[] obsoleteFactoryFilePaths,
+                                                        string[] newFactoryFilePaths)
         {
             var ellapsedTime = TimeSpan.FromMilliseconds(chrono.ElapsedMilliseconds);
             var statisticsFormat = obsoleteFactoryFilePaths.Any() || newFactoryFilePaths.Any()
@@ -367,10 +347,9 @@
             Logger.InfoFormat("Generated {0} in {1}.", factoryStatistics, ellapsedTime.Humanize(2));
         }
 
-        private static ITypeSymbol ResolveGenericArgument(
-            INamedTypeSymbol factoryInterfaceTypeSymbol,
-            ITypeSymbol methodReturnType,
-            INamedTypeSymbol[] genericArgumentTypeSymbols)
+        private static ITypeSymbol ResolveGenericArgument(INamedTypeSymbol factoryInterfaceTypeSymbol,
+                                                          ITypeSymbol methodReturnType,
+                                                          INamedTypeSymbol[] genericArgumentTypeSymbols)
         {
             if (methodReturnType is INamedTypeSymbol)
             {
@@ -384,9 +363,8 @@
                        : methodReturnType;
         }
 
-        private static IMethodSymbol SelectConstructorFromFactoryMethod(
-            IMethodSymbol factoryMethod,
-            INamedTypeSymbol concreteClassSymbol)
+        private static IMethodSymbol SelectConstructorFromFactoryMethod(IMethodSymbol factoryMethod,
+                                                                        INamedTypeSymbol concreteClassSymbol)
         {
             var factoryMethodParameters = factoryMethod.Parameters;
             var instanceConstructors = concreteClassSymbol.InstanceConstructors
@@ -395,8 +373,7 @@
 
             try
             {
-                var matchedInstanceConstructors = instanceConstructors.GroupBy(
-                                                                               c => factoryMethodParameters.Select(fmp => fmp.Name)
+                var matchedInstanceConstructors = instanceConstructors.GroupBy(c => factoryMethodParameters.Select(fmp => fmp.Name)
                                                                                                            .Count(c.Parameters.Select(cp => cp.Name).Contains))
                                                                       .ToArray();
                 var selectedGrouping = matchedInstanceConstructors.SingleOrDefault(g => g.Key == factoryMethodParameters.Length);
@@ -415,21 +392,10 @@
             }
         }
 
-        private JObject Transform(
-            JObject factoryFile,
-            string transformationScriptPath)
-        {
-            dynamic script = this.csscriptEvaluator.Value.LoadFile(transformationScriptPath);
-            var @out = script.Transform(factoryFile);
-
-            return @out;
-        }
-
-        private static bool VerifyAndAddHash(
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
-            string fileHash,
-            Project project,
-            string relativeFilePath)
+        private static bool VerifyAndAddHash(Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
+                                             string fileHash,
+                                             Project project,
+                                             string relativeFilePath)
         {
             var identifier = project.FilePath.Replace(Path.GetDirectoryName(project.Solution.FilePath), string.Empty).TrimStart('\\');
             if (!fileHashesPerProject.ContainsKey(identifier))
@@ -454,11 +420,10 @@
             return false;
         }
 
-        private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(
-            Compilation compilation,
-            bool isSdkStyleProject,
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
-            Project project)
+        private async Task<ICollection<string>> GenerateFactoriesInProjectAsync(Compilation compilation,
+                                                                                bool isSdkStyleProject,
+                                                                                Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
+                                                                                Project project)
         {
             var generatedFactoriesList = new List<string>();
 
@@ -497,13 +462,12 @@
             return generatedFactoriesList;
         }
 
-        private (string, bool)? GenerateFactoryForClass(
-            ClassDeclarationSyntax concreteClassDeclarationSyntax,
-            INamedTypeSymbol concreteClassTypeSymbol,
-            Compilation compilation,
-            bool isSdkStyleProject,
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
-            Project project)
+        private (string, bool)? GenerateFactoryForClass(ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                                        INamedTypeSymbol concreteClassTypeSymbol,
+                                                        Compilation compilation,
+                                                        bool isSdkStyleProject,
+                                                        Dictionary<string, Dictionary<string, string>> fileHashesPerProject,
+                                                        Project project)
         {
             var factoryAttribute = GetFactoryAttributeFromClassDeclaration(concreteClassDeclarationSyntax);
 
@@ -530,8 +494,7 @@
                     var genericArguments = genericsPostfix.Trim('<', '>').Split(',');
                     var genericArgumentCount = genericArguments.Length;
 
-                    genericArgumentTypeSymbols = genericArguments.SelectMany(
-                                                                             arg => namespaces.Select(ns => $"{ns}.{arg}")
+                    genericArgumentTypeSymbols = genericArguments.SelectMany(arg => namespaces.Select(ns => $"{ns}.{arg}")
                                                                                               .Concat(new[] { arg })
                                                                                               .Select(compilation.GetTypeByMetadataName)
                                                                                               .Where(o => o != null)
@@ -577,9 +540,9 @@
             var relativeFilePath = Path.Combine(folders, typeDeclarationDocument.Name);
 
             bool IsLinkedFile()
-               => !typeDeclarationDocument.FilePath.StartsWith(Path.GetDirectoryName(project.FilePath), StringComparison.OrdinalIgnoreCase);
+                => !typeDeclarationDocument.FilePath.StartsWith(Path.GetDirectoryName(project.FilePath), StringComparison.OrdinalIgnoreCase);
 
-            if (IsLinkedFile()) 
+            if (IsLinkedFile())
                 return null;
 
             using SHA1Managed sha1 = new SHA1Managed();
@@ -605,9 +568,8 @@
             return (generatedFilePath, true);
         }
 
-        private void RemoveObsoleteFactoriesFromSolution(
-            string[] obsoleteFactoryFilePaths,
-            Dictionary<string, bool> isSdkStyleProjectDict)
+        private void RemoveObsoleteFactoriesFromSolution(string[] obsoleteFactoryFilePaths,
+                                                         Dictionary<string, bool> isSdkStyleProjectDict)
         {
             if (obsoleteFactoryFilePaths.Length == 0)
             {
@@ -634,8 +596,7 @@
             Interlocked.Exchange(ref this.solution, newSolution);
         }
 
-        private void RemoveObsoleteHashes(
-            Dictionary<string, Dictionary<string, string>> fileHashesPerProject)
+        private void RemoveObsoleteHashes(Dictionary<string, Dictionary<string, string>> fileHashesPerProject)
         {
             foreach (var projectPath in fileHashesPerProject.Keys.ToArray())
             {
@@ -658,14 +619,13 @@
             }
         }
 
-        private void RenderFactoryImplementation(
-            string generatedFilePath,
-            ClassDeclarationSyntax concreteClassDeclarationSyntax,
-            INamedTypeSymbol concreteClassTypeSymbol,
-            INamedTypeSymbol factoryInterfaceTypeSymbol,
-            string factoryName,
-            INamedTypeSymbol[] genericArgumentTypeSymbols,
-            bool isSdkStyleProject)
+        private void RenderFactoryImplementation(string generatedFilePath,
+                                                 ClassDeclarationSyntax concreteClassDeclarationSyntax,
+                                                 INamedTypeSymbol concreteClassTypeSymbol,
+                                                 INamedTypeSymbol factoryInterfaceTypeSymbol,
+                                                 string factoryName,
+                                                 INamedTypeSymbol[] genericArgumentTypeSymbols,
+                                                 bool isSdkStyleProject)
         {
             var fileName = Path.GetFileName(generatedFilePath);
             var factoryInterfaceName = factoryInterfaceTypeSymbol.Name;
@@ -703,21 +663,21 @@
 
             // Class attributes
             var classAttributes = concreteClassDeclarationSyntax.AttributeLists
-                                                                .SelectMany(al => al.Attributes).Where(
-                                                                                                       attributeSyntax =>
+                                                                .SelectMany(al => al.Attributes).Where(attributeSyntax =>
                                                                                                        {
                                                                                                            var attributeName = attributeSyntax.Name.ToString();
                                                                                                            return this.attributeImportList.Any(attributeName.Contains);
                                                                                                        })
-                                                                .Select(
-                                                                        a =>
+                                                                .Select(a =>
                                                                         {
-                                                                            var lastIndex = a.ArgumentList.Arguments.Count - 1;
+                                                                            var arguments = Enumerable.Empty<Value>();
+                                                                            if (a.ArgumentList != null && a.ArgumentList.Arguments.Any())
+                                                                            {
+                                                                                var lastIndex = a.ArgumentList.Arguments.Count - 1;
+                                                                                arguments = a.ArgumentList.Arguments.Select((arg,
+                                                                                                                             i) => new Value(arg.ToString(), i == lastIndex));
+                                                                            }
 
-                                                                            var arguments = a.ArgumentList.Arguments.Select(
-                                                                                                                            (
-                                                                                                                                arg,
-                                                                                                                                i) => new Value(arg.ToString(), i == lastIndex));
                                                                             return Attribute.Create(a.Name.ToString(), arguments);
                                                                         })
                                                                 .Concat(
@@ -761,13 +721,23 @@
                                                  outerUsingDeclarations.ToFullString());
 
             object model = factoryFile;
-            var transformationScript = string.Format(@"{0}\{1}.tcs", Path.GetDirectoryName(this.templatePath), factoryFile.FactoryFor);
+            var transformationScript = $@"{Path.GetDirectoryName(this.templatePath)}\{factoryFile.FactoryFor}.tcs";
 
             // Execute the script associated to the template in order to adapt the model for the template whether it exists.
             if (File.Exists(transformationScript))
             {
                 var json = JObject.FromObject(factoryFile);
-                model = this.Transform(json, transformationScript);
+                var attributesArray = (JArray)json["Class"]["Attributes"];
+                var factoryForAttributes = attributesArray.Where(a => a["Name"]?.ToString().Contains("FactoryFor") == true).ToList();
+
+                if (factoryForAttributes.Count > 1)
+                {
+                    model = TransformMultipleFactoryForAttributes(json, factoryForAttributes, transformationScript);
+                }
+                else
+                {
+                    model = this.Transform(json, transformationScript);
+                }
             }
 
             var projectFolder = Path.GetDirectoryName(project.FilePath);
@@ -791,6 +761,56 @@
             File.WriteAllText(generatedFilePath, factoryResult.Code, Encoding.UTF8);
         }
 
+        private JObject Transform(JObject factoryFile,
+                                  string transformationScriptPath)
+        {
+            dynamic script = this.csscriptEvaluator.Value.LoadFile(transformationScriptPath);
+            return script.Transform(factoryFile);
+        }
+
+        private JObject TransformMultipleFactoryForAttributes(JObject json,
+                                                              List<JToken> factoryForAttributes,
+                                                              string transformationScript)
+        {
+            var attributesArray = (JArray)json["Class"]["Attributes"];
+            var systemAttributeNames = new[] { "global::System.CodeDom.Compiler.GeneratedCode", "global::System.Diagnostics.DebuggerNonUserCodeAttribute" };
+
+            // Separate FactoryFor from other attributes
+            var otherAttributes = attributesArray.Where(a => a["Name"]?.ToString().Contains("FactoryFor") != true).ToList();
+            attributesArray.Clear();
+            foreach (var attr in otherAttributes) attributesArray.Add(attr);
+
+            // Transform each FactoryFor and collect newly generated attributes
+            var transformedAttributes = new List<JToken>();
+            foreach (var factoryForAttr in factoryForAttributes)
+            {
+                var tempJson = (JObject)json.DeepClone();
+                ((JArray)tempJson["Class"]["Attributes"]).Add(factoryForAttr);
+
+                if (this.Transform(tempJson, transformationScript) is JObject transformedObj)
+                {
+                    var newAttributes = ((JArray)transformedObj["Class"]["Attributes"])
+                        .Where(attr =>
+                               {
+                                   var name = attr["Name"]?.ToString();
+                                   return !systemAttributeNames.Contains(name) &&
+                                          otherAttributes.All(o => o["Name"]?.ToString() != name);
+                               });
+                    transformedAttributes.AddRange(newAttributes);
+                }
+            }
+
+            // Transform base model and add all transformed attributes
+            var model = this.Transform(json, transformationScript);
+            if (model is JObject finalModel)
+            {
+                var finalAttrs = (JArray)finalModel["Class"]["Attributes"];
+                foreach (var attr in transformedAttributes) finalAttrs.Add(attr);
+            }
+
+            return model;
+        }
+
         #endregion
 
         private class ParameterEqualityComparer : IEqualityComparer<IParameterSymbol>
@@ -804,9 +824,8 @@
             /// true if the specified objects are equal; otherwise, false.
             /// </returns>
             /// <param name="x">The first object of type <paramref name="T"/> to compare.</param><param name="y">The second object of type <paramref name="T"/> to compare.</param>
-            public bool Equals(
-                IParameterSymbol x,
-                IParameterSymbol y)
+            public bool Equals(IParameterSymbol x,
+                               IParameterSymbol y)
             {
                 return x.Name.Equals(y.Name) && x.Type.Name.Equals(y.Type.Name);
             }
@@ -818,8 +837,7 @@
             /// A hash code for the specified object.
             /// </returns>
             /// <param name="obj">The <see cref="T:System.Object"/> for which a hash code is to be returned.</param><exception cref="T:System.ArgumentNullException">The type of <paramref name="obj"/> is a reference type and <paramref name="obj"/> is null.</exception>
-            public int GetHashCode(
-                IParameterSymbol obj)
+            public int GetHashCode(IParameterSymbol obj)
             {
                 unchecked
                 {

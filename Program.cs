@@ -76,16 +76,26 @@
 
             CommandLineOptions = result.Value;
 
+            var version = System.Diagnostics.FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).ProductVersion;
+            Console.WriteLine("Factory Generator version {0}", version);
+            Console.WriteLine();
+            Console.WriteLine("Command line arguments:");
+            Console.WriteLine("  Solution (-s): {0}", CommandLineOptions.SolutionPath);
+            Console.WriteLine("  Template Path (-t): {0}", CommandLineOptions.TemplatePath);
+            Console.WriteLine("  Attribute Import List (-a): {0}", CommandLineOptions.AttributeImportList);
+            Console.WriteLine();
+
             try
             {
                 var vsInstances = MSBuildLocator.QueryVisualStudioInstances();
                 var vs2017 = vsInstances.FirstOrDefault(x => x.Version.Major == 15);
                 var vs2019 = vsInstances.FirstOrDefault(x => x.Version.Major == 16);
                 var vs2022 = vsInstances.FirstOrDefault(x => x.Version.Major == 17);
+                var vs2026 = vsInstances.FirstOrDefault(x => x.Version.Major == 18);
 
-                VisualStudioInstance usedInstance = vs2022 ?? vs2019 ?? vs2017;
+                VisualStudioInstance usedInstance = vs2026 ?? vs2022 ?? vs2019 ?? vs2017;
                 if (usedInstance == null)
-                    throw new Exception("Could not find VS 2019 or VS 2017 installation");
+                    throw new Exception("Could not find VS2026, VS2022, VS2019 or VS2017 installation");
                 MSBuildLocator.RegisterInstance(usedInstance);
 
                 GenerateFactoriesAsync(CommandLineOptions.SolutionPath,
